@@ -19,13 +19,13 @@ RESULTS_DIR = Path("./results")
 DATASETS = (
     # name, label-column, categorical, ignore
     ("balance-scale", 4, (0,), ()),
-    ("breast-cancer-wisconsin", 10, (), (0,)),
-    ("ecoli", 8, (8,), (0,)),
-    ("glass", 10, (), (0,)),
-    ("haberman", 3, (), ()),
-    ("iris", 4, (4,), ()),
-    ("letter-recognition", 0, (0,), ()),
-    ("wine", 0, (), ()),
+    # ("breast-cancer-wisconsin", 10, (), (0,)),
+    # ("ecoli", 8, (8,), (0,)),
+    # ("glass", 10, (), (0,)),
+    # ("haberman", 3, (), ()),
+    # ("iris", 4, (4,), ()),
+    # ("letter-recognition", 0, (0,), ()),
+    # ("wine", 0, (), ()),
 )
 
 
@@ -89,10 +89,49 @@ def plot(dataset, scores):
     heights = [i - bottom for i in scores.values()]
 
     fig, ax = plt.subplots(1, 1)
-    ax.bar(scores.keys(), heights, bottom=bottom, color="black")
+    bar = ax.bar(scores.keys(), heights, bottom=bottom)
     ax.grid()
     ax.set_title(dataset)
+    label_bars(ax, bar, "{:.2f}")
     fig.savefig(plot_file.as_posix())
+
+
+def label_bars(ax, bars, text_format, **kwargs):
+    """
+    Attaches a label on every bar of a regular or horizontal bar chart
+    """
+    ys = [bar.get_y() for bar in bars]
+    y_is_constant = all(
+        y == ys[0] for y in ys
+    )  # -> regular bar chart, since all all bars start on the same y level (0)
+
+    if y_is_constant:
+        _label_bar(ax, bars, text_format, **kwargs)
+    else:
+        _label_barh(ax, bars, text_format, **kwargs)
+
+
+def _label_bar(ax, bars, text_format, **kwargs):
+    """
+    Attach a text label to each bar displaying its y value
+    """
+    max_y_value = ax.get_ylim()[1]
+    inside_distance = max_y_value * 0.05
+    outside_distance = max_y_value * 0.01
+
+    for bar in bars:
+        text = text_format.format(bar.get_height())
+        text_x = bar.get_x() + bar.get_width() / 2
+
+        is_inside = bar.get_height() >= max_y_value * 0.15
+        if is_inside:
+            color = "white"
+            text_y = bar.get_height() - inside_distance
+        else:
+            color = "black"
+            text_y = bar.get_height() + outside_distance
+
+        ax.text(text_x, text_y, text, ha="center", va="bottom", color=color, **kwargs)
 
 
 def main():
