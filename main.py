@@ -85,12 +85,12 @@ def get_score(
 def plot(dataset, scores):
     plot_file = RESULTS_DIR / f"{dataset}.png"
 
-    bottom = min(scores.values()) ** 1.5 - .01
+    bottom = min(scores.values()) ** 1.5 - 0.01
     heights = [i - bottom for i in scores.values()]
     print(bottom, heights)
 
     fig, ax = plt.subplots(1, 1)
-    bar = ax.bar(scores.keys(), heights, bottom=bottom, )
+    bar = ax.bar(scores.keys(), heights, bottom=bottom)
     ax.grid()
     ax.set_title(dataset)
     # label_bars(ax, bar, "{:.2f}")
@@ -204,17 +204,16 @@ def test_bagging_boosted(data, bagging, boosting):
 def main():
     np.random.seed(42)
     RESULTS_DIR.mkdir(exist_ok=True)
-    n = 5
 
     results = {}
     for i in DATASETS:
         dataset = i[0]
         print(dataset)
-        # plot(dataset, {"a": 1.0, "b": 1.0})
-        # continue
         X, y = load_data(*i)
         X_train, X_test, y_train, y_test = train_test_split(X, y)
         data = X_train, y_train, X_test, y_test
+
+        n = 2 if dataset == "letter-recognition" else 5
 
         results_bagging = test_bagging(data)
         with open(RESULTS_DIR / f"{dataset}_bagging.json", "w") as f:
