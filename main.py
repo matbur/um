@@ -2,6 +2,7 @@ from pathlib import Path
 import re
 import io
 import json
+from pprint import pprint
 
 import requests
 import pandas as pd
@@ -19,13 +20,13 @@ RESULTS_DIR = Path("./results")
 DATASETS = (
     # name, label-column, categorical, ignore
     ("balance-scale", 4, (0,), ()),
-    # ("breast-cancer-wisconsin", 10, (), (0,)),
-    # ("ecoli", 8, (8,), (0,)),
-    # ("glass", 10, (), (0,)),
-    # ("haberman", 3, (), ()),
-    # ("iris", 4, (4,), ()),
-    # ("letter-recognition", 0, (0,), ()),
-    # ("wine", 0, (), ()),
+    ("breast-cancer-wisconsin", 10, (), (0,)),
+    ("ecoli", 8, (8,), (0,)),
+    ("glass", 10, (), (0,)),
+    ("haberman", 3, (), ()),
+    ("iris", 4, (4,), ()),
+    ("wine", 0, (), ()),
+    ("letter-recognition", 0, (0,), ()),
 )
 
 
@@ -82,17 +83,17 @@ def get_score(
 
 
 def plot(dataset, scores):
-    RESULTS_DIR.mkdir(exist_ok=True)
     plot_file = RESULTS_DIR / f"{dataset}.png"
 
-    bottom = min(scores.values()) ** 1.5
+    bottom = min(scores.values()) ** 1.5 - .01
     heights = [i - bottom for i in scores.values()]
+    print(bottom, heights)
 
     fig, ax = plt.subplots(1, 1)
-    bar = ax.bar(scores.keys(), heights, bottom=bottom)
+    bar = ax.bar(scores.keys(), heights, bottom=bottom, )
     ax.grid()
     ax.set_title(dataset)
-    label_bars(ax, bar, "{:.2f}")
+    # label_bars(ax, bar, "{:.2f}")
     fig.savefig(plot_file.as_posix())
 
 
@@ -134,27 +135,108 @@ def _label_bar(ax, bars, text_format, **kwargs):
         ax.text(text_x, text_y, text, ha="center", va="bottom", color=color, **kwargs)
 
 
+def _label_barh(ax, bars, text_format, **kwargs):
+    pass
+
+
+def bagging_hyperparameters():
+    for n_estimators in [5, 10, 20, 40, 100]:
+        for max_samples in [0.3, 0.6, 1.0]:
+            for max_features in [0.3, 0.6, 1.0]:
+                for bootstrap in [True, False]:
+                    for bootstrap_features in [True, False]:
+                        yield {
+                            "n_estimators": n_estimators,
+                            "max_samples": max_samples,
+                            "max_features": max_features,
+                            "bootstrap": bootstrap,
+                            "bootstrap_features": bootstrap_features,
+                        }
+
+
+def boosting_hyperparameters():
+    for n_estimators in [5, 10, 20, 40, 100]:
+        for learning_rate in [0.3, 0.6, 1.0]:
+            for algorithm in ["SAMME", "SAMME.R"]:
+                yield {
+                    "n_estimators": n_estimators,
+                    "learning_rate": learning_rate,
+                    "algorithm": algorithm,
+                }
+
+
+def test_bagging(data):
+    l = []
+    for i in bagging_hyperparameters():
+        print("running bagging", i)
+        model = BaggingClassifier(**i)
+        score = get_score(model, *data)
+        print(score)
+        l.append({"bagging": i, "score": score})
+    return sorted(l, key=lambda x: x["score"], reverse=True)
+
+
+def test_boosting(data):
+    l = []
+    for i in boosting_hyperparameters():
+        print("running boosting", i)
+        model = AdaBoostClassifier(**i)
+        score = get_score(model, *data)
+        print(score)
+        l.append({"boosting": i, "score": score})
+    return sorted(l, key=lambda x: x["score"], reverse=True)
+
+
+def test_bagging_boosted(data, bagging, boosting):
+    l = []
+    for i in bagging:
+        i = i["bagging"]
+        for j in boosting:
+            j = j["boosting"]
+            print("running bagging boosted", i, j)
+            model = BaggingClassifier(AdaBoostClassifier(**j), **i)
+            score = get_score(model, *data)
+            print(score)
+            l.append({"bagging": i, "boosting": j, "score": score})
+    return sorted(l, key=lambda x: x["score"], reverse=True)
+
+
 def main():
     np.random.seed(42)
+    RESULTS_DIR.mkdir(exist_ok=True)
+    n = 5
+
     results = {}
     for i in DATASETS:
         dataset = i[0]
         print(dataset)
+        # plot(dataset, {"a": 1.0, "b": 1.0})
+        # continue
         X, y = load_data(*i)
         X_train, X_test, y_train, y_test = train_test_split(X, y)
+        data = X_train, y_train, X_test, y_test
+
+        results_bagging = test_bagging(data)
+        with open(RESULTS_DIR / f"{dataset}_bagging.json", "w") as f:
+            json.dump(results_bagging, f, indent="  ")
+        best_bagging = results_bagging[0]
+
+        result_boosting = test_boosting(data)
+        with open(RESULTS_DIR / f"{dataset}_boosting.json", "w") as f:
+            json.dump(result_boosting, f, indent="  ")
+        best_boosting = result_boosting[0]
+
+        results_bagging_boosted = test_bagging_boosted(
+            data, results_bagging[:n], result_boosting[:n]
+        )
+        with open(RESULTS_DIR / f"{dataset}_bagging_boosted.json", "w") as f:
+            json.dump(results_bagging_boosted, f, indent="  ")
+        best_bagging_boosted = results_bagging_boosted[0]
 
         scores = {
-            "bagging": get_score(BaggingClassifier(), X_train, y_train, X_test, y_test),
-            "adaboost": get_score(
-                AdaBoostClassifier(), X_train, y_train, X_test, y_test
-            ),
-            "bagging_adaboost": get_score(
-                BaggingClassifier(AdaBoostClassifier()),
-                X_train,
-                y_train,
-                X_test,
-                y_test,
-            ),
+            "bagging": best_bagging["score"],
+            "adaboost": best_boosting["score"],
+            "bagging_adaboost": best_bagging_boosted["score"],
         }
 
         for method, score in scores.items():
@@ -164,7 +246,7 @@ def main():
         results[dataset] = scores
 
     with open(RESULTS_DIR / "results.json", "w") as f:
-        json.dump(results, f)
+        json.dump(results, f, indent="  ")
 
 
 if __name__ == "__main__":
