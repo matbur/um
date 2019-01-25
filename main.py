@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 import io
 import json
-from pprint import pprint
+from itertools import product
 
 import requests
 import pandas as pd
@@ -140,18 +140,31 @@ def _label_barh(ax, bars, text_format, **kwargs):
 
 
 def bagging_hyperparameters():
-    for n_estimators in [5, 10, 20, 40, 100]:
-        for max_samples in [0.3, 0.6, 1.0]:
-            for max_features in [0.3, 0.6, 1.0]:
-                for bootstrap in [True, False]:
-                    for bootstrap_features in [True, False]:
-                        yield {
-                            "n_estimators": n_estimators,
-                            "max_samples": max_samples,
-                            "max_features": max_features,
-                            "bootstrap": bootstrap,
-                            "bootstrap_features": bootstrap_features,
-                        }
+    n_estimators_all = [5, 10, 20, 40, 100]
+    max_samples_all = [0.3, 0.6, 1.0]
+    max_features_all = [0.3, 0.6, 1.0]
+    bootstrap_all = [True, False]
+    bootstrap_features_all = [True, False]
+    for (
+        n_estimators,
+        max_samples,
+        max_features,
+        bootstrap,
+        bootstrap_features,
+    ) in product(
+        n_estimators_all,
+        max_samples_all,
+        max_features_all,
+        bootstrap_all,
+        bootstrap_features_all,
+    ):
+        yield {
+            "n_estimators": n_estimators,
+            "max_samples": max_samples,
+            "max_features": max_features,
+            "bootstrap": bootstrap,
+            "bootstrap_features": bootstrap_features,
+        }
 
 
 def boosting_hyperparameters():
